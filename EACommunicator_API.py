@@ -7,6 +7,7 @@ import zmq
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+from datetime import datetime
 
 from io import StringIO
 
@@ -25,9 +26,10 @@ class TradingCommands(Enum):
     CLOSE_POSITION = 11 # ok
     GET_LAST_TICK_DATA = 12
     GET_X_BARS = 13
-    UPDATE_MARKET = 14
-    GET_SERVER_TIME = 15
-    CHECK_TEST_MODE = 16
+    GET_X_BARS_INTERVAL = 14
+    UPDATE_MARKET = 15
+    GET_SERVER_TIME = 16
+    CHECK_TEST_MODE = 17
 
 class EACommunicator_API:
     
@@ -196,7 +198,9 @@ class EACommunicator_API:
     def Get_last_x_bars_from_now(self,
                                  instrument: str = 'EURUSD',
                                  timeframe: str = 'D1',
-                                 nbrofbars: int = 1000) -> np.array:
+                                 nbrofbars: int = 1000,
+                                 start_time: datetime = None
+                                ) -> np.array:
         """
         Retrieves last x bars from a MT4 or MT5 EA bot.
 
@@ -218,8 +222,12 @@ class EACommunicator_API:
             print("[Get_last_x_bars_from_now] ERROR : {} not exist !".format(instrument))
             return {}
         timeframeInt = self.get_timeframe_value(timeframe)
-        arguments = f"{symbol}^{timeframeInt}^{nbrofbars}"
-        csvReply = self.send_command(TradingCommands.GET_X_BARS, arguments)
+        if start_time is None:
+            arguments = f"{symbol}^{timeframeInt}^{nbrofbars}"
+            csvReply = self.send_command(TradingCommands.GET_X_BARS, arguments)
+        else:
+            arguments = f"{symbol}^{timeframeInt}^{int(start_time.timestamp())}"
+            csvReply = self.send_command(TradingCommands.GET_X_BARS_INTERVAL, arguments)
         
         # Convert csv to pandas dataframe
         df = self.readCsv(csvReply)
