@@ -216,12 +216,11 @@ class EACommunicator_API:
             close,
             volume
         """
-        symbol = instrument
-        #if instrument in self.Symbols:
-        #    symbol = instrument
-        #else:
-        #    print("[Get_last_x_bars_from_now] ERROR : {} not exist !".format(instrument))
-        #    return {}
+        if instrument in self.Symbols:
+            symbol = instrument
+        else:
+            print("[Get_last_x_bars_from_now] ERROR : {} not exist !".format(instrument))
+            return {}
         timeframeInt = self.get_timeframe_value(timeframe)
         if start_time is None:
             arguments = f"{symbol}^{timeframeInt}^{nbrofbars}"
