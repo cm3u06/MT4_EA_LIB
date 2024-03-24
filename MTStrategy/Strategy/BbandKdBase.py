@@ -11,7 +11,6 @@ from . import DEBUG
 class BbandKdBase(Strategy):
 
     def __init__(self, mt : EACommunicator_API, symbols:list, **kwargs):
-        super().__init__(mt, symbols, **kwargs)
 
         # default parameter
         parms = {
@@ -32,14 +31,12 @@ class BbandKdBase(Strategy):
             'close_trade.SL_mode': 2,
             'close_trade.timeframe':'D',
             'close_trade.nbrofbars':30,
-            'comment':[self.__name__, 'STOCK_HIT_BBABDS_LB']
+            'comment':[self.__class__.__name__, 'STOCK_HIT_BBABDS_LB']
         }
 
-        self.kwargs = parms | self.kwargs # kwargs will overwrite parms
+        kwargs = parms | kwargs # kwargs will overwrite parms
 
-        print(f'[{self.__name__}:INFO] parameters ')
-        for k,v in self.kwargs.items():
-            print(f'{k:<35} = {v.__str__():>20}')
+        super().__init__(mt, symbols, **kwargs)
 
 
     def entry_signal(self):

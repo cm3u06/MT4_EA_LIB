@@ -13,16 +13,16 @@ class Strategy:
 
         
         self.symbols = symbols
-        if symbols:
+        if self.symbols:
             print(f'[{self.__class__.__name__}:INFO] symbol = {symbols}')
         else:
             print(f'[{self.__class__.__name__}:ERROR] No symbol !')
 
         self.kwargs = kwargs
-        if kwargs:
+        if self.kwargs:
             print(f'[{self.__class__.__name__}:INFO] parameters:')
-            for k,v in kwargs:
-                print(f'{k:20} = {v:20}')
+            for k,v in self.kwargs.items():
+                print(f'{k:20} = {v.__str__():20}')
         
 
     def entry_signal(self):
