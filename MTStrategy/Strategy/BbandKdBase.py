@@ -32,13 +32,14 @@ class BbandKdBase(Strategy):
             'close_trade.SL_mode': 2,
             'close_trade.timeframe':'D',
             'close_trade.nbrofbars':30,
+            'comment':[self.__name__, 'STOCK_HIT_BBABDS_LB']
         }
 
         self.kwargs = parms | self.kwargs # kwargs will overwrite parms
 
         print(f'[{self.__name__}:INFO] parameters ')
         for k,v in self.kwargs.items():
-            print(f'{k:<35} = {v:>20}')
+            print(f'{k:<35} = {v.__str__():>20}')
 
 
     def entry_signal(self):
@@ -148,18 +149,26 @@ class BbandKdBase(Strategy):
 
     def filter(self, symbols: list):
         __fname__ = f'{self.__name__}:filter'
+        
+        func_check_comment = {item : lambda x, item=item: x.startswith(item) for item in self.kwargs['comment'] }
 
         open_position = self.mt.Get_all_open_positions()
         close_position = self.mt.Get_all_closed_positions()
         filter_symbols = symbols[:]
         print(f'[{__fname__}:symbols] => {symbols}')
         for symbol in symbols:
+
                 
-            if ((open_position['symbol']==symbol) & (open_position['comment'].str.startswith(self.__name__))).any():
+            if ((open_position['symbol']==symbol) & 
+                (open_position['comment'].transform(func_check_comment).any(axis=1))
+                ).any():
                 filter_symbols.remove(symbol)
             elif self.now_srv is not None:
                 today_srv = self.now_srv.strftime('%Y.%m.%d')
-                if ((close_position['symbol']==symbol) & (close_position['comment'].str.startswith(self.__name__)) & (close_position['opentime']==today_srv)).any() :
+                if ((close_position['symbol']==symbol) & 
+                    (close_position['comment'].transform(func_check_comment).any(axis=1)) &
+                    (close_position['opentime']==today_srv)
+                    ).any() :
                     filter_symbols.remove(symbol)
 
         print(f'[{__fname__}:filter_symbols] => {filter_symbols}')
@@ -259,6 +268,7 @@ class BbandKdBase(Strategy):
     def close_trade(self, exit_symbols:list):
         __fname__ = f'{self.__name__}:close_trade'
 
+
         open_position = self.mt.Get_all_open_positions()
             
         for id, order in open_position.iterrows():
@@ -269,7 +279,7 @@ class BbandKdBase(Strategy):
             comment = order['comment']
             print(f'[{__fname__}:INFO] ticket = {ticket}, IN = {openprice}, SL= {stoploss}')
 
-            if comment == self.__name__ and \
+            if comment.startswith(tuple(self.kwargs['comment'])) and \
             (sid in exit_symbols or stoploss >= openprice):
 
                 info = self.mt.Get_instrument_info(sid)
