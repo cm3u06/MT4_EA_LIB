@@ -104,7 +104,7 @@ class BbandKdBase(Strategy):
                 'close_gt_high_low_avg1' : (df['close'] > ((df['high']+df['low'])/2).shift() ),
                 'up_candle1' : (df['close'].shift() > df['open'].shift() ),
                 'up_candle' : (df['close'] > df['open'] ),
-                'now_srv_gt1500': self.now_srv.time() >= dt.time(15,0,0),
+                'now_mrk_gt1500': self.now_mrk.time() >= dt.time(15,0,0),
             }
 
             cond_dict = \
@@ -128,7 +128,7 @@ class BbandKdBase(Strategy):
                     'close_min',
                     {'|': [
                         {'&':['up_candle1','close_gt_high_low_avg1']},
-                        {'&':[ {'~':[ 'up_candle1']}, {'|':['close_gt_high_low_avg1', 'up_candle']}, 'now_srv_gt1500'  ]}
+                        {'&':[ {'~':[ 'up_candle1']}, {'|':['close_gt_high_low_avg1', 'up_candle']}, 'now_mrk_gt1500'  ]}
                     ]}
             ]}
 
@@ -378,8 +378,9 @@ class BbandKdBase(Strategy):
                         print(f'[{__fname__}:INFO] Close position {sid} : {ticket} FAIL !')
 
 
-    def run(self, now_srv):
-        self.now_srv = now_srv
+    def run(self, **kwargs):
+        self.now_srv = kwargs['now_srv']
+        self.now_mrk = kwargs['now_mrk']
         super().run()
 
 

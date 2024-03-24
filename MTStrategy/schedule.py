@@ -56,7 +56,11 @@ class Strategy_Scheduler:
                             print(f"@ServerTime={now_srv.isoformat(timespec='seconds')}")
                             print(f"@MarketTime={now_mrk.isoformat(timespec='seconds')}")
                             print(f"exec_times = {exec_times}")
-                            kwargs = {'now_srv': now_srv}
+                            kwargs = {
+                                'now_srv': now_srv,
+                                'now_mrk': now_mrk,
+                                'now_lca': now_lca,
+                                }
                             self.strategy.run(**kwargs)
                             self.trade_interval[i] = True
                     else:
