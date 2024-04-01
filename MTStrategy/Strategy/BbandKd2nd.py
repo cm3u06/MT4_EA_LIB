@@ -7,35 +7,35 @@ from MTStrategy.EACommunicator_API import *
 from MTStrategy.utils import *
 from .Strategy import Strategy
 
-class BbandKdBase(Strategy):
+class BbandKd2nd(Strategy):
 
     def __init__(self, mt : EACommunicator_API, symbols:list, **kwargs):
 
         # default parameter
         parms = {
-            'entry.nbrofbars': 30,
-            'entry.bb_near_ratio': 0.15,
-            'entry.bb_window': 5,
-            'entry.rr_ratio':2.0,
-            'entry.min_price':10,
+            'entry.nbrofbars':30,
+            'entry.rr_ratio':1.0,
+            'exit.bb_near_ratio' : 0,
             'open_trade.money':10000,
             'open_trade.lotsize_limit':0.005,
             'open_trade.timeframe':'D',
             'open_trade.drop_vio_lotsize':True,
+            'open_trade.nbrofbars':30,
             'exit.timeframe':'D',
             'exit.nbrofbars':30,
-            'exit.kd_window':5,
-            'exit.bb_window':5,
-            'exit.bb_near_ratio':0.15,
-            'close_trade.SL_mode': 2,
+            'exit.bb_near_ratio':0,
             'close_trade.timeframe':'D',
             'close_trade.nbrofbars':30,
-            'comment':[self.__class__.__name__, 'STOCK_HIT_BBANDS_LB']
+            'close_trade.SL_mode':0,
+            'comment':[self.__class__.__name__]
         }
 
         kwargs = parms | kwargs # kwargs will overwrite parms
 
         super().__init__(mt, symbols, **kwargs)
+
+
+            
 
 
     def entry_signal(self):
@@ -51,79 +51,24 @@ class BbandKdBase(Strategy):
             tick = self.mt.Get_last_tick_info(sid)
             MESSAGE(__fname__, f'tick = {tick}', MESS_VERBOSITY.DEBUG)
             df = self.mt.Get_ohlcv(instrument=sid, timeframe='D', nbrofbars=self.kwargs['entry.nbrofbars'])
-            MESSAGE(__fname__, f'price = {df}', MESS_VERBOSITY.DEBUG)
+            MESSAGE(__fname__, f'price = \n{df}', MESS_VERBOSITY.DEBUG)
+            #df_h4 = self.mt.Get_ohlcv(instrument=sid, timeframe='H4', nbrofbars=self.kwargs['entry.nbrofbars'])
+            #MESSAGE(__fname__, f'price_h4 = \n{df_h4}', MESS_VERBOSITY.DEBUG)
             KD = abstract.STOCH(df,fastk_period=9)
             BB = abstract.BBANDS(df, 21, 2.1, 2.1)
             
 
             conditions = {
-                'KD_up_crs_D_lte20_win10' : ( \
-                    (KD['slowk'] <= KD['slowd']).shift() \
-                    & (KD['slowk'] > KD['slowd']) \
-                    & (KD['slowd'] <= 20) \
-                    & (((df['low'] - BB['lowerband'])/(BB['middleband']-BB['lowerband'])).shift() <= 0.15 )) \
-                .rolling(10).sum() > 0,
-                'KD_crs3_win10' : \
-                ((((KD['slowk'] - KD['slowd']) >= 0).diff() != 0).rolling(10).sum() > 3) \
-                & ((KD['slowd'] <= 20).rolling(10).sum() > 7),
-                'KD_diff_pos' : (KD['slowk'] - KD['slowd']) >= 0,
-                'KD_diff3' : (KD['slowk'] - KD['slowd']) >= 3,
-                'KD_diff_inc' : (KD['slowk']-KD['slowd']).diff() > 0,
-                'KD_diff_inc_win2' : ((KD['slowk']-KD['slowd']).diff() > 0).rolling(2).sum() >= 2,
-                'KD_diff_lt3_win4_shift1' : ((KD['slowk']-KD['slowd']).abs() < 3.0).rolling(4).sum().shift() == 4,
-                'KD_K_slope_pos' : KD['slowk'] > KD['slowk'].shift(),
-                'KD_D_slope_pos' : KD['slowd'] > KD['slowd'].shift(),
-                'KD_D_slope_pos3' : (KD['slowd'] > KD['slowd'].shift()).rolling(3).sum() == 3,
-                'KD_D_slope_neg_win4_shift1' : (KD['slowd'] <= KD['slowd'].shift()).rolling(4).sum().shift() == 4,
-                'KD_D_lt20_win4_shift1' : (KD['slowd'] < 20).rolling(4).sum().shift() == 4,
-                'KD_D_inc6_win2' : (KD['slowd'] - KD['slowd'].shift(2)) >= 6,
-                'KD_K_inc4' : (KD['slowk'] - KD['slowk'].shift()) >= 4,
-                'KD_K_slope_gte5' : (KD['slowk'] - KD['slowk'].shift()) >= 5,
-                'KD_K_slope_gte10' : (KD['slowk'] - KD['slowk'].shift()) >= 10,
-                'KD_saturate_gt6' : KD['slowd'].rolling(6).max() < 20,
-                'BB_nearLB_win' : ( \
-                    ((df['low'] - BB['lowerband'])/(BB['middleband']-BB['lowerband']) <= self.kwargs['entry.bb_near_ratio'] ) \
-                ).rolling(self.kwargs['entry.bb_window']).sum() > 0,
-                'BB_nearLB' : ((df['low'] - BB['lowerband'])/(BB['middleband']-BB['lowerband']) <= 0.7 ),
-                'BB_RiskReward' : ( ((BB['upperband']-tick['ask'])/ (tick['ask']-df['low'].rolling(5).min()+tick['spread']*info['point']) ) >= self.kwargs['entry.rr_ratio'] ),
-                'BB_nearLB_win13' : ( \
-                    (df['low'] <= BB['lowerband']) \
-                    | ((df['low'] - BB['lowerband'])/(BB['middleband']-BB['lowerband']) <= self.kwargs['entry.bb_near_ratio'] ) \
-                ).rolling(13).sum() > 0,
-                'close_min' : (df['close'] > self.kwargs['entry.min_price']),
-                'close_gt_close1' : (df['close'] > df['close'].shift() ),
-                'close_gt_high1' : (df['close'] > df['high'].shift() ),
-                'close_gt_close_open_avg1' : (df['close'] > ((df['close']+df['open'])/2).shift() ),
-                'close_gt_high_low_avg1' : (df['close'] > ((df['high']+df['low'])/2).shift() ),
-                'up_candle1' : (df['close'].shift() > df['open'].shift() ),
-                'up_candle' : (df['close'] > df['open'] ),
-                'now_mrk_gt1500': self.now_mrk.time() >= dt.time(15,0,0),
+                'breakout_middle_sft1' : \
+                    (df['close'].shift() > BB['middleband'].shift()) 
+                    & (df['open'].shift() <= BB['middleband'].shift())
+                    & (df['close'] > BB['middleband'])
+                    & (df['open'] > BB['middleband']) ,
+                'BB_RiskReward' : ( ((BB['upperband']-tick['ask'])/ (tick['ask']-find_high_pre_low(df)+tick['spread']*info['point']) ) >= self.kwargs['entry.rr_ratio'] ),
             }
 
             cond_dict = \
-            {'&' : [
-                    {'&':['KD_up_crs_D_lte20_win10',
-                        {'|':[
-                            {'&': [{'|':['KD_D_lt20_win4_shift1','KD_diff_lt3_win4_shift1']}, 'KD_diff_pos','KD_D_inc6_win2','KD_diff_inc']},
-                            #{'&': [{'~': [{'|':['KD_saturate_gt6''KD_crs3_win10']}]},{'|':['KD_diff3','KD_K_inc6']}, 'KD_K_slope_pos','KD_D_slope_pos']}
-                            {'&': [
-                                {'~': [{'|':['KD_D_lt20_win4_shift1','KD_diff_lt3_win4_shift1']}]},
-                                'KD_diff_pos',
-                                {'|':[
-                                    {'&':['KD_K_slope_pos', 'KD_D_slope_pos']},
-                                    'KD_K_inc4'
-                                ]}
-                            ]}
-                        ]}
-                    ]},
-                    'BB_RiskReward',
-                    'BB_nearLB',
-                    'close_min',
-                    {'|': [
-                        {'&':['up_candle1','close_gt_high_low_avg1']},
-                        {'&':[ {'~':[ 'up_candle1']}, {'|':['close_gt_high_low_avg1', 'up_candle']}, 'now_mrk_gt1500'  ]}
-                    ]}
-            ]}
+            {'&' : ['breakout_middle_sft1','BB_RiskReward' ]}
 
             
             signal[sid] = recursive_reduce(cond_dict, conditions)
@@ -147,17 +92,31 @@ class BbandKdBase(Strategy):
         __fname__ = f'{self.__name__}:filter'
         
         func_check_comment = {item : lambda x, item=item: x.startswith(item) for item in self.kwargs['comment'] }
+        base_order_names = ['BbandKdBase', 'STOCK_HIT_BBANDS_LB']
+        check_base_order_exist = {item : lambda x, item=item: x.startswith(item) for item in base_order_names }
 
         open_position = self.mt.Get_all_open_positions()
+        MESSAGE(__fname__, f'open_position = {open_position}', MESS_VERBOSITY.DEBUG)
         close_position = self.mt.Get_all_closed_positions()
+        MESSAGE(__fname__, f'close_position = {close_position}', MESS_VERBOSITY.DEBUG)
         filter_symbols = symbols[:]
         MESSAGE(__fname__, f'symbols = {symbols}', MESS_VERBOSITY.INFO)
         for symbol in symbols:
   
-            if ((open_position['symbol']==symbol) & 
+            # if no base order
+            if ~((open_position['symbol']==symbol) &
+               (open_position['comment'].fillna('').transform(check_base_order_exist).any(axis=1))).any():
+                filter_symbols.remove(symbol)
+                MESSAGE(__fname__, f"{open_position['comment'].fillna('').transform(check_base_order_exist)}", MESS_VERBOSITY.DEBUG)
+
+            # if 2nd order exist
+            elif ((open_position['symbol']==symbol) & 
                 (open_position['comment'].fillna('').transform(func_check_comment).any(axis=1))
                 ).any():
                 filter_symbols.remove(symbol)
+                MESSAGE(__fname__, f"{open_position['comment'].fillna('').transform(func_check_comment)}", MESS_VERBOSITY.DEBUG)
+
+            # if 2nd order has exist today ever
             elif self.now_srv is not None:
                 today_srv = self.now_srv.strftime('%Y.%m.%d')
                 if ((close_position['symbol']==symbol) & 
@@ -165,6 +124,7 @@ class BbandKdBase(Strategy):
                     (close_position['opentime']==today_srv)
                     ).any() :
                     filter_symbols.remove(symbol)
+                    MESSAGE(__fname__, f"{close_position['comment'].fillna('').transform(func_check_comment)}", MESS_VERBOSITY.DEBUG)
 
         MESSAGE(__fname__, f'filter_symbols = {filter_symbols}', MESS_VERBOSITY.INFO)
         return filter_symbols
@@ -175,22 +135,21 @@ class BbandKdBase(Strategy):
 
         money_each_order = self.kwargs['open_trade.money'] * self.kwargs['open_trade.lotsize_limit']
 
+        MESSAGE(__fname__, f'entry_symbols = {entry_symbols}', MESS_VERBOSITY.DEBUG)
         
         ticket = {}
         for sid in entry_symbols:
-            MESSAGE(__fname__, f' {sid} ==============', MESS_VERBOSITY.INFO)
+            MESSAGE(__fname__, f'{sid} ==============', MESS_VERBOSITY.INFO)
 
-
-            df = self.mt.Get_ohlcv(instrument=sid, timeframe=self.kwargs['open_trade.timeframe'], nbrofbars=20)
-            MESSAGE(__fname__, f'price = {df}', MESS_VERBOSITY.DEBUG)
+            df = self.mt.Get_ohlcv(instrument=sid, timeframe=self.kwargs['open_trade.timeframe'], nbrofbars=self.kwargs['open_trade.nbrofbars'])
+            MESSAGE(__fname__, f'price = \n{df}', MESS_VERBOSITY.DEBUG)
             info = self.mt.Get_instrument_info(sid)
             MESSAGE(__fname__, f'info = {info}', MESS_VERBOSITY.DEBUG)
             tick = self.mt.Get_last_tick_info(sid)
             MESSAGE(__fname__, f'tick = {tick}', MESS_VERBOSITY.DEBUG)
 
-
             ask = tick['ask']
-            lowest = df['low'].iloc[-5:].min()
+            lowest = find_high_pre_low(df)
             MESSAGE(__fname__, f'ask = {ask}, lowest = {lowest}', MESS_VERBOSITY.DEBUG)
 
             risk = max(ask - lowest + info['point']*tick['spread'] , info['stop_level']*info['point'], 1)
@@ -231,23 +190,12 @@ class BbandKdBase(Strategy):
             
         
             conditions = {
-            'KD' : ( \
-                (KD['slowk'] >= KD['slowd']).shift() \
-                & (KD['slowk'] < KD['slowd']) \
-                & (KD['slowd'] >= 80) \
-            ).rolling(self.kwargs['exit.kd_window']).sum()>0,
-            'BB_NearUB' :  ( \
-                (BB['upperband'] <= df['high']) \
-                | ((BB['upperband'] - df['high'])/(BB['upperband']-BB['middleband']) <= self.kwargs['exit.bb_near_ratio'] )
-                ).rolling(self.kwargs['exit.bb_window']).sum() > 0,
-            'Close' : (df['close'] < df['close'].shift() ),
-                'SMA_up4': (BB['middleband'].diff()>0).rolling(4).sum() == 4,
+            'BB_NearUB' : ((BB['upperband'] - df['high'])/(BB['upperband']-BB['middleband']) <= self.kwargs['exit.bb_near_ratio'] ),
+            'Close' : (df['close'] > df['open'] )
             }
 
             cond_dict = {'&':[
-                'KD',
                 'BB_NearUB',
-                'Close',
             ]}
             
             sell = recursive_reduce(cond_dict, conditions)

@@ -6,6 +6,7 @@ from threading import Thread, Event
 import time
 from MTStrategy import EACommunicator_API
 from MTStrategy.Strategy import Strategy
+from MTStrategy.utils import *
 
 
 def srv_tz_dst_compensate(src_dt):
@@ -39,6 +40,7 @@ class Strategy_Scheduler:
             self.idle_second = idle_second
 
         def EXEC_LOOP(ev: Event):
+            __fname__ = self.__class__.__name__+':EXEC_LOOP'
             exec_times    = 0
             while not ev.is_set():
                 now_srv        = dt.datetime.fromtimestamp(timestamp=self.mt.GetServerTime(),tz=pytz.utc).replace(tzinfo=self.tz_srv)
@@ -51,11 +53,11 @@ class Strategy_Scheduler:
                         and (now_mrk <  trade_dt_list[i+1]) :
                         if not self.trade_interval[i]:
                             exec_times=exec_times+1
-                            print(f"\nStrategy[{self.strategy.__class__.__name__}] Scheduled")
-                            print(f"@LocalTime ={now_lca.isoformat(timespec='seconds')}")
-                            print(f"@ServerTime={now_srv.isoformat(timespec='seconds')}")
-                            print(f"@MarketTime={now_mrk.isoformat(timespec='seconds')}")
-                            print(f"exec_times = {exec_times}")
+                            MESSAGE(__fname__, f"\nStrategy[{self.strategy.__class__.__name__}] Scheduled" , MESS_VERBOSITY.INFO)
+                            MESSAGE(__fname__, f"@LocalTime ={now_lca.isoformat(timespec='seconds')}", MESS_VERBOSITY.INFO)
+                            MESSAGE(__fname__, f"@ServerTime={now_srv.isoformat(timespec='seconds')}", MESS_VERBOSITY.INFO)
+                            MESSAGE(__fname__, f"@MarketTime={now_mrk.isoformat(timespec='seconds')}", MESS_VERBOSITY.INFO)
+                            MESSAGE(__fname__, f"exec_times = {exec_times}", MESS_VERBOSITY.INFO)
                             kwargs = {
                                 'now_srv': now_srv,
                                 'now_mrk': now_mrk,
@@ -66,13 +68,13 @@ class Strategy_Scheduler:
                     else:
                         self.trade_interval[i] = False
     
-                print(f"Tick Finished @ServerTime {now_srv.isoformat(timespec='seconds')}")
+                MESSAGE(__fname__, f"Tick Finished @ServerTime {now_srv.isoformat(timespec='seconds')}", MESS_VERBOSITY.NONE)
                 self.mt.Break()
 
                 # early stop; used for MT4 Testing ending
                 if end_date_mrk != None and \
                    now_mrk >= end_date_mrk.replace(tzinfo=self.tz_mrk):
-                    print("End of session !")
+                    MESSAGE(__fname__, f"End of session !", MESS_VERBOSITY.NONE)
                     self.ev.set()
 
                 cnt = 0

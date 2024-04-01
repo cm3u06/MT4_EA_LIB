@@ -1,28 +1,29 @@
 import pandas as pd
 from MTStrategy.EACommunicator_API import EACommunicator_API
+from MTStrategy.utils import *
 
 class Strategy:
 
     def __init__(self, mt : EACommunicator_API, symbols:list, **kwargs):
         self.__name__ = self.__class__.__name__
-        print(f'[{self.__name__}:INFO] initialzation')
+        MESSAGE(self.__name__, 'initialzation', MESS_VERBOSITY.INFO)
         if mt:
             self.mt = mt
         else:
-            print(f'[{self.__class__.__name__}:ERROR] mt is not exists !')
+            MESSAGE(self.__name__, 'mt is not exists !', MESS_VERBOSITY.ERROR)
 
         
         self.symbols = symbols
         if self.symbols:
-            print(f'[{self.__class__.__name__}:INFO] symbol = {symbols}')
+            MESSAGE(self.__name__, f'symbol = {symbols}', MESS_VERBOSITY.INFO)
         else:
-            print(f'[{self.__class__.__name__}:ERROR] No symbol !')
+            MESSAGE(self.__name__, 'No symbol !', MESS_VERBOSITY.ERROR)
 
         self.kwargs = kwargs
         if self.kwargs:
-            print(f'[{self.__class__.__name__}:INFO] parameters:')
+            MESSAGE(self.__name__, f'parameters:', MESS_VERBOSITY.INFO)
             for k,v in self.kwargs.items():
-                print(f'{k:20} = {v.__str__():20}')
+                MESSAGE(self.__name__, f'{k:20} = {v.__str__():20}', MESS_VERBOSITY.INFO)
         
 
     def entry_signal(self):
@@ -38,13 +39,13 @@ class Strategy:
         pass
 
     def run(self, **kwargs):
-        print(f'[{self.__name__}:INFO] phase(run({kwargs})')
-        print(f'[{self.__name__}:INFO] phase(exit_signal)')
+        MESSAGE(self.__name__, f'phase(run({kwargs})', MESS_VERBOSITY.INFO)
+        MESSAGE(self.__name__, f'phase(exit_signal)', MESS_VERBOSITY.INFO)
         exit_symbols = self.exit_signal()
-        print(f'[{self.__name__}:INFO] phase(close_trade)')
+        MESSAGE(self.__name__, f'phase(close_trade)', MESS_VERBOSITY.INFO)
         self.close_trade(exit_symbols)
-        print(f'[{self.__name__}:INFO] phase(entry_signal)')
+        MESSAGE(self.__name__, f'phase(entry_signal)', MESS_VERBOSITY.INFO)
         entry_symbols = self.entry_signal()
-        print(f'[{self.__name__}:INFO] phase(open_trade)')
+        MESSAGE(self.__name__, f'phase(open_trade)', MESS_VERBOSITY.INFO)
         self.open_trade(entry_symbols)
-        print(f'[{self.__name__}:INFO] phase(done)')
+        MESSAGE(self.__name__, f'phase(done)', MESS_VERBOSITY.INFO)
