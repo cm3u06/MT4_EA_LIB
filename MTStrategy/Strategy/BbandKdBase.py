@@ -13,6 +13,7 @@ class BbandKdBase(Strategy):
 
         # default parameter
         parms = {
+            'entry.mode': 0,
             'entry.nbrofbars': 30,
             'entry.bb_near_ratio': 0.15,
             'entry.bb_window': 5,
@@ -81,6 +82,7 @@ class BbandKdBase(Strategy):
                 'KD_K_slope_gte5' : (KD['slowk'] - KD['slowk'].shift()) >= 5,
                 'KD_K_slope_gte10' : (KD['slowk'] - KD['slowk'].shift()) >= 10,
                 'KD_saturate_gt6' : KD['slowd'].rolling(6).max() < 20,
+                'KD_D_lt25' : KD['slowd'] < 25,
                 'BB_nearLB_win' : ( \
                     ((df['low'] - BB['lowerband'])/(BB['middleband']-BB['lowerband']) <= self.kwargs['entry.bb_near_ratio'] ) \
                 ).rolling(self.kwargs['entry.bb_window']).sum() > 0,
@@ -93,37 +95,64 @@ class BbandKdBase(Strategy):
                 'close_min' : (df['close'] > self.kwargs['entry.min_price']),
                 'close_gt_close1' : (df['close'] > df['close'].shift() ),
                 'close_gt_high1' : (df['close'] > df['high'].shift() ),
-                'close_gt_close_open_avg1' : (df['close'] > ((df['close']+df['open'])/2).shift() ),
+                'close_gt_open1' : (df['close'] > df['open'].shift() ),
+                'close_gt_open_close_avg1' : (df['close'] > ((df['close']+df['open'])/2).shift() ),
                 'close_gt_high_low_avg1' : (df['close'] > ((df['high']+df['low'])/2).shift() ),
                 'up_candle1' : (df['close'].shift() > df['open'].shift() ),
                 'up_candle' : (df['close'] > df['open'] ),
                 'now_mrk_gt1500': self.now_mrk.time() >= dt.time(15,0,0),
             }
 
-            cond_dict = \
-            {'&' : [
-                    {'&':['KD_up_crs_D_lte20_win10',
-                        {'|':[
-                            {'&': [{'|':['KD_D_lt20_win4_shift1','KD_diff_lt3_win4_shift1']}, 'KD_diff_pos','KD_D_inc6_win2','KD_diff_inc']},
-                            #{'&': [{'~': [{'|':['KD_saturate_gt6''KD_crs3_win10']}]},{'|':['KD_diff3','KD_K_inc6']}, 'KD_K_slope_pos','KD_D_slope_pos']}
-                            {'&': [
-                                {'~': [{'|':['KD_D_lt20_win4_shift1','KD_diff_lt3_win4_shift1']}]},
-                                'KD_diff_pos',
-                                {'|':[
-                                    {'&':['KD_K_slope_pos', 'KD_D_slope_pos']},
-                                    'KD_K_inc4'
+            if self.kwargs['entry.mode']==0:
+                cond_dict = \
+                {'&' : [
+                        {'&':['KD_up_crs_D_lte20_win10',
+                            {'|':[
+                                {'&': [{'|':['KD_D_lt20_win4_shift1','KD_diff_lt3_win4_shift1']}, 'KD_diff_pos','KD_D_inc6_win2','KD_diff_inc']},
+                                {'&': [
+                                    {'~': [{'|':['KD_D_lt20_win4_shift1','KD_diff_lt3_win4_shift1']}]},
+                                    'KD_diff_pos',
+                                    {'|':[
+                                        {'&':['KD_K_slope_pos', 'KD_D_slope_pos']},
+                                        'KD_K_inc4'
+                                    ]}
                                 ]}
                             ]}
+                        ]},
+                        'BB_RiskReward',
+                        'BB_nearLB',
+                        'close_min',
+                        'KD_D_lt25',
+                        {'|': [
+                            {'&':['up_candle1','close_gt_high_low_avg1']},
+                            {'&':[ {'~':[ 'up_candle1']}, {'|':['close_gt_high_low_avg1', 'up_candle']}, 'now_mrk_gt1500'  ]}
                         ]}
-                    ]},
-                    'BB_RiskReward',
-                    'BB_nearLB',
-                    'close_min',
-                    {'|': [
-                        {'&':['up_candle1','close_gt_high_low_avg1']},
-                        {'&':[ {'~':[ 'up_candle1']}, {'|':['close_gt_high_low_avg1', 'up_candle']}, 'now_mrk_gt1500'  ]}
-                    ]}
-            ]}
+                ]}
+            elif self.kwargs['entry.mode']==1:
+                cond_dict = \
+                {'&' : [
+                        {'&':['KD_up_crs_D_lte20_win10',
+                            'KD_diff_pos',
+                            #'KD_diff_inc',
+                            'KD_K_slope_pos'
+                        ]},
+                        'BB_RiskReward',
+                        'BB_nearLB',
+                        'close_min',
+                        'up_candle',
+                        'KD_D_lt25',
+                        #{'|': [
+                        #    {'&':['up_candle1']},
+                        #    {'&':[ {'~':[ 'up_candle1']}, 'close_gt_open_close_avg1', 'now_mrk_gt1500'  ]}
+                        #]}
+                ]}
+            elif self.kwargs['entry.mode']==2:
+                cond_dict = \
+                {'&' : [
+                        {'&':['KD_up_crs_D_lte20_win10',
+                        ]},
+                        'up_candle',
+                ]}
 
             
             signal[sid] = recursive_reduce(cond_dict, conditions)
@@ -132,9 +161,11 @@ class BbandKdBase(Strategy):
         
         MESSAGE(__fname__, f'signal_df = {signal_df.tail(5)}', MESS_VERBOSITY.DEBUG)
         for k,v in conditions.items():
-            if type(v)==pd.DataFrame:
-                MESSAGE(__fname__, f'{k}', MESS_VERBOSITY.DEBUG)
-                MESSAGE(__fname__, f'{v.iloc[-1]}', MESS_VERBOSITY.DEBUG)
+            MESSAGE(__fname__, f'{k}', MESS_VERBOSITY.DEBUG)
+            if isinstance(v,pd.DataFrame) or isinstance(v,pd.Series):
+                MESSAGE(__fname__, f'{k} : {v.iloc[-1]}', MESS_VERBOSITY.DEBUG)
+            else:
+                MESSAGE(__fname__, f'{k} : {v}', MESS_VERBOSITY.DEBUG)
 
         entry_symbols_0 = list(signal_df.columns[signal_df.iloc[-1]])
 

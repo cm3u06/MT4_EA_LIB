@@ -11,7 +11,7 @@ port = 5555
 for i,arg in enumerate(sys.argv):
     print(f'argv[{i}]={arg}')
 if len(sys.argv) >= 2:
-    re_match_port = re.match(sys.argv[1],'--port=(\d+)')
+    re_match_port = re.match('--port=(\d+)',sys.argv[1])
     if re_match_port:
         port = re_match_port.group(1)
 print(f'port={port}')

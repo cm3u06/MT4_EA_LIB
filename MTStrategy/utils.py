@@ -77,13 +77,13 @@ DEBUG_ENTRY = {
     'BbandKdBase:filter' : False,
     'BbandKdBase:exit_signal' : False,
     'BbandKdBase:close_trade' : False,
-    'BbandKdBase:open_trade' : True,
-    'BbandKd2nd:entry_signal' : True,
-    'BbandKd2nd:filter' : True,
+    'BbandKdBase:open_trade' : False,
+    'BbandKd2nd:entry_signal' : False,
+    'BbandKd2nd:filter' : False,
     'BbandKd2nd:exit_signal' : False,
     'BbandKd2nd:close_trade' : False,
     'BbandKd2nd:open_trade' : False,
-    'find_high_pre_low' : True,
+    'find_high_pre_low' : False,
 }
 
 

@@ -52,8 +52,8 @@ class BbandKd2nd(Strategy):
             MESSAGE(__fname__, f'tick = {tick}', MESS_VERBOSITY.DEBUG)
             df = self.mt.Get_ohlcv(instrument=sid, timeframe='D', nbrofbars=self.kwargs['entry.nbrofbars'])
             MESSAGE(__fname__, f'price = \n{df}', MESS_VERBOSITY.DEBUG)
-            #df_h4 = self.mt.Get_ohlcv(instrument=sid, timeframe='H4', nbrofbars=self.kwargs['entry.nbrofbars'])
-            #MESSAGE(__fname__, f'price_h4 = \n{df_h4}', MESS_VERBOSITY.DEBUG)
+            df_h4 = self.mt.Get_ohlcv(instrument=sid, timeframe='H4', nbrofbars=self.kwargs['entry.nbrofbars'])
+            MESSAGE(__fname__, f'price_h4 = \n{df_h4}', MESS_VERBOSITY.DEBUG)
             KD = abstract.STOCH(df,fastk_period=9)
             BB = abstract.BBANDS(df, 21, 2.1, 2.1)
             
@@ -65,10 +65,11 @@ class BbandKd2nd(Strategy):
                     & (df['close'] > BB['middleband'])
                     & (df['open'] > BB['middleband']) ,
                 'BB_RiskReward' : ( ((BB['upperband']-tick['ask'])/ (tick['ask']-find_high_pre_low(df)+tick['spread']*info['point']) ) >= self.kwargs['entry.rr_ratio'] ),
+                'BB_RiskReward_h4' : ( ((BB['upperband']-tick['ask'])/ (tick['ask']-find_high_pre_low(df_h4)+tick['spread']*info['point']) ) >= self.kwargs['entry.rr_ratio'] ),
             }
 
             cond_dict = \
-            {'&' : ['breakout_middle_sft1','BB_RiskReward' ]}
+            {'&' : ['breakout_middle_sft1',{'|':['BB_RiskReward','BB_RiskReward_h4']} ]}
 
             
             signal[sid] = recursive_reduce(cond_dict, conditions)
@@ -77,9 +78,10 @@ class BbandKd2nd(Strategy):
         
         MESSAGE(__fname__, f'signal_df = {signal_df.tail(5)}', MESS_VERBOSITY.DEBUG)
         for k,v in conditions.items():
-            if type(v)==pd.DataFrame:
-                MESSAGE(__fname__, f'{k}', MESS_VERBOSITY.DEBUG)
-                MESSAGE(__fname__, f'{v.iloc[-1]}', MESS_VERBOSITY.DEBUG)
+            if isinstance(v,pd.DataFrame) or isinstance(v,pd.Series):
+                MESSAGE(__fname__, f'{k} : {v.iloc[-1]}', MESS_VERBOSITY.DEBUG)
+            else:
+                MESSAGE(__fname__, f'{k} : {v}', MESS_VERBOSITY.DEBUG)
 
         entry_symbols_0 = list(signal_df.columns[signal_df.iloc[-1]])
 
@@ -143,6 +145,8 @@ class BbandKd2nd(Strategy):
 
             df = self.mt.Get_ohlcv(instrument=sid, timeframe=self.kwargs['open_trade.timeframe'], nbrofbars=self.kwargs['open_trade.nbrofbars'])
             MESSAGE(__fname__, f'price = \n{df}', MESS_VERBOSITY.DEBUG)
+            df_h4 = self.mt.Get_ohlcv(instrument=sid, timeframe='H4', nbrofbars=self.kwargs['open_trade.nbrofbars'])
+            MESSAGE(__fname__, f'price_h4 = \n{df_h4}', MESS_VERBOSITY.DEBUG)
             info = self.mt.Get_instrument_info(sid)
             MESSAGE(__fname__, f'info = {info}', MESS_VERBOSITY.DEBUG)
             tick = self.mt.Get_last_tick_info(sid)
@@ -150,19 +154,27 @@ class BbandKd2nd(Strategy):
 
             ask = tick['ask']
             lowest = find_high_pre_low(df)
-            MESSAGE(__fname__, f'ask = {ask}, lowest = {lowest}', MESS_VERBOSITY.DEBUG)
+            lowest_h4 = find_high_pre_low(df_h4)
+            MESSAGE(__fname__, f'ask = {ask}, lowest = {lowest}, lowest(h4) = {lowest_h4}', MESS_VERBOSITY.DEBUG)
 
             risk = max(ask - lowest + info['point']*tick['spread'] , info['stop_level']*info['point'], 1)
+            risk_h4 = max(ask - lowest_h4 + info['point']*tick['spread'] , info['stop_level']*info['point'], 1)
             stoploss = ask - risk
+            stoploss_h4 = ask - risk_h4
             #lotsize = max(money_each_order / risk //info['lot_step'] *info['lot_step'] , info['min_lotsize'])
             lotsize = money_each_order / risk //info['lot_step'] *info['lot_step']
+            lotsize_h4 = money_each_order / risk_h4 //info['lot_step'] *info['lot_step']
             MESSAGE(__fname__, f'lotsize = {lotsize:.2f}, openprice = {ask}, stoploss = {stoploss}\n', MESS_VERBOSITY.INFO)
+            MESSAGE(__fname__, f'lotsize(h4) = {lotsize_h4:.2f}, openprice = {ask}, stoploss_h4 = {stoploss_h4}\n', MESS_VERBOSITY.INFO)
 
-            if self.kwargs['open_trade.drop_vio_lotsize'] and lotsize < info['min_lotsize']:
+            if self.kwargs['open_trade.drop_vio_lotsize'] and lotsize < info['min_lotsize'] and lotsize_h4 < info['min_lotsize']:
                 MESSAGE(__fname__, f'lotsize is too small to open trade !', MESS_VERBOSITY.WARNING)
                 return
             else:
-                lotsize = max(info['min_lotsize'], lotsize)
+                if lotsize < info['min_lotsize']:
+                    lotsize = max(info['min_lotsize'], lotsize_h4)
+                else:
+                    lotsize = max(info['min_lotsize'], lotsize)
                 
                 ticket[sid] =  self.mt.Open_order(
                     instrument = sid,
